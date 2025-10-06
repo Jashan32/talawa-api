@@ -1,5 +1,8 @@
+import type { FileUpload } from "graphql-upload-minimal";
+import { ulid } from "ulidx";
 import { uuidv7 } from "uuidv7";
 import { z } from "zod";
+import { imageMimeTypeEnum } from "~/src/drizzle/enums/imageMimeType";
 import { postAttachmentsTable } from "~/src/drizzle/tables/postAttachments";
 import { postsTable } from "~/src/drizzle/tables/posts";
 import { builder } from "~/src/graphql/builder";
@@ -11,8 +14,53 @@ import { Post } from "~/src/graphql/types/Post/Post";
 import { TalawaGraphQLError } from "~/src/utilities/TalawaGraphQLError";
 import { getKeyPathsWithNonUndefinedValues } from "~/src/utilities/getKeyPathsWithNonUndefinedValues";
 import envConfig from "~/src/utilities/graphqLimits";
+import { isNotNullish } from "~/src/utilities/isNotNullish";
 const mutationCreatePostArgumentsSchema = z.object({
-	input: mutationCreatePostInputSchema,
+	input: mutationCreatePostInputSchema.transform(async (arg, ctx) => {
+		let images:
+			| (FileUpload & {
+					mimetype: z.infer<typeof imageMimeTypeEnum>;
+			  })[]
+			| null
+			| undefined;
+
+		if (isNotNullish(arg.images)) {
+			const rawImages = await Promise.all(arg.images);
+			const validatedImages: (FileUpload & {
+				mimetype: z.infer<typeof imageMimeTypeEnum>;
+			})[] = [];
+
+			for (let i = 0; i < rawImages.length; i++) {
+				const rawImage = rawImages[i];
+				if (rawImage) {
+					const { data, success } = imageMimeTypeEnum.safeParse(rawImage.mimetype);
+
+					if (!success) {
+						ctx.addIssue({
+							code: "custom",
+							path: ["images", i],
+							message: `Mime type ${rawImage.mimetype} not allowed for image upload.`,
+						});
+					} else {
+						validatedImages.push(
+							Object.assign(rawImage, {
+								mimetype: data,
+							}),
+						);
+					}
+				}
+			}
+
+			images = validatedImages;
+		} else if (arg.images !== undefined) {
+			images = null;
+		}
+
+		return {
+			...arg,
+			images,
+		};
+	}),
 });
 
 builder.mutationField("createPost", (t) =>
@@ -162,31 +210,52 @@ builder.mutationField("createPost", (t) =>
 					});
 				}
 
-				if (parsedArgs.input.attachments !== undefined) {
-					const attachments = parsedArgs.input.attachments;
+				const allAttachments: any[] = [];
 
-					const createdPostAttachments = await tx
-						.insert(postAttachmentsTable)
-						.values(
-							attachments.map((attachment) => ({
-								creatorId: currentUserId,
-								mimeType: attachment.mimetype,
-								id: uuidv7(),
-								name: attachment.name,
-								postId: createdPost.id,
-								objectName: attachment.objectName,
-								fileHash: attachment.fileHash,
-							})),
-						)
-						.returning();
+				// Handle direct image uploads
+				if (isNotNullish(parsedArgs.input.images)) {
+					const imageAttachments = [];
 
-					return Object.assign(createdPost, {
-						attachments: createdPostAttachments,
-					});
+					for (const image of parsedArgs.input.images) {
+						const objectName = ulid();
+						
+						// Upload image to MinIO
+						await ctx.minio.client.putObject(
+							ctx.minio.bucketName,
+							objectName,
+							image.createReadStream(),
+							undefined,
+							{
+								"content-type": image.mimetype,
+							},
+						);
+
+						// Create attachment record
+						const imageAttachment = {
+							creatorId: currentUserId,
+							mimeType: image.mimetype,
+							id: uuidv7(),
+							name: objectName || "uploaded-image",
+							postId: createdPost.id,
+							objectName: image.filename,
+							fileHash: ulid(), // Generate a unique hash for direct uploads
+						};
+
+						imageAttachments.push(imageAttachment);
+					}
+
+					if (imageAttachments.length > 0) {
+						const createdImageAttachments = await tx
+							.insert(postAttachmentsTable)
+							.values(imageAttachments)
+							.returning();
+
+						allAttachments.push(...createdImageAttachments);
+					}
 				}
 
 				return Object.assign(createdPost, {
-					attachments: [],
+					attachments: allAttachments,
 				});
 			});
 		},

@@ -1,3 +1,4 @@
+import type { FileUpload } from "graphql-upload-minimal";
 import { z } from "zod";
 import {
 	mimeTypeMapping,
@@ -53,6 +54,7 @@ export const mutationCreatePostInputSchema = postsTableInsertSchema
 	})
 	.extend({
 		attachments: z.array(fileMetadataSchema).min(1).max(20).optional(),
+		images: z.array(z.custom<Promise<FileUpload>>()).max(10).optional(),
 		isPinned: z.boolean().optional(),
 	});
 
@@ -64,11 +66,14 @@ export const MutationCreatePostInput = builder.inputType(
 			attachments: t.field({
 				description: "Metadata for files already uploaded via presigned URL",
 				type: [FileMetadataInput],
-				required: true,
 			}),
 			caption: t.string({
 				description: "Caption about the post.",
 				required: true,
+			}),
+			images: t.field({
+				description: "Image files to upload directly",
+				type: ["Upload"],
 			}),
 			isPinned: t.boolean({
 				description: "Boolean to tell if the post is pinned",

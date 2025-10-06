@@ -1,4 +1,5 @@
 import "./Post";
+import "./attachmentURL";
 import "./comments";
 import "./commentsCount";
 import "./creator";

@@ -542,9 +542,6 @@ input CreateActionItemInput {
 }
 
 input CreatePluginInput {
-  backup: Boolean
-  isActivated: Boolean
-  isInstalled: Boolean
   pluginId: String!
 }
 
@@ -902,6 +899,10 @@ type HasUserVotedComment {
 
   """Type of the comment vote, null if no vote exists"""
   voteType: CommentVoteType
+}
+
+input InstallPluginInput {
+  pluginId: String!
 }
 
 enum InviteStatus {
@@ -1808,6 +1809,7 @@ type Mutation {
 
   """Mutation field to delete a venue booking."""
   deleteVenueBooking(input: MutationDeleteVenueBookingInput!): Venue
+  installPlugin(input: InstallPluginInput!): Plugin
 
   """Mutation field to join a public organization."""
   joinPublicOrganization(
@@ -2290,10 +2292,13 @@ input MutationCreateOrganizationMembershipInput {
 """Input for creating a new post"""
 input MutationCreatePostInput {
   """Metadata for files already uploaded via presigned URL"""
-  attachments: [FileMetadataInput!]!
+  attachments: [FileMetadataInput!]
 
   """Caption about the post."""
   caption: String!
+
+  """Image files to upload directly"""
+  images: [Upload!]
 
   """Boolean to tell if the post is pinned"""
   isPinned: Boolean
@@ -3762,6 +3767,9 @@ type Plugin {
 }
 
 type Post {
+  """URL to the first image attachment as avatar of the post."""
+  attachmentURL: String
+
   """Array of attachments."""
   attachments: [PostAttachment!]
 
