@@ -124,3 +124,4 @@ import "./acceptEventInvitation";
 import "./verifyEventInvitation";
 import "./requestPasswordReset";
 import "./resetPassword";
+import "./recaptcha";
