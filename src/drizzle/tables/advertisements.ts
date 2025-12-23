@@ -91,7 +91,9 @@ export const advertisementsTable = pgTable(
 			onDelete: "set null",
 			onUpdate: "cascade",
 		}),
-
+		/**
+		 * Type of the advertisement (banner, menu, or pop_up).
+		 */
 		type: text("type", {
 			enum: advertisementTypeEnum.options,
 		}).notNull(),
