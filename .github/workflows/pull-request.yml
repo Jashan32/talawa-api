@@ -49,6 +49,104 @@ jobs:
           echo "Error: Source and Target Branches are the same. Please ensure they are different."
           echo "Error: Close this PR and try again."
           exit 1
+  Run-Sample-Data-Script:
+    name: Check if sample data script runs without errors
+    runs-on: ubuntu-latest
+    needs: [Code-Quality-Checks]
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Create .env file for sample data testing
+        run: cp ./envFiles/.env.ci ./.env
+
+      - name: Build talawa api compose testing environment
+        run: docker compose build
+
+      - name: Start Postgres and MinIO services
+        run: docker compose up -d postgres minio
+
+      - name: Wait for Postgres to be ready
+        run: |
+          set -euo pipefail
+          echo "Waiting for Postgres (service: postgres)…"
+          timeout=90
+          until docker compose exec -T postgres pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1 || [ $timeout -eq 0 ]; do
+            echo "Postgres not ready yet... ($timeout seconds remaining)"
+            sleep 1
+            ((timeout--))
+          done
+          if [ $timeout -eq 0 ]; then
+            echo "Error: Postgres failed to start"
+            docker compose ps
+            docker compose logs postgres
+            docker compose down -v
+            exit 1
+          else
+            echo "Postgres is ready."
+          fi
+
+      - name: Wait for MinIO to be ready
+        run: |
+          set -euo pipefail
+          echo "Waiting for MinIO service…"
+          timeout=60
+          until curl -f http://localhost:9000/minio/health/live >/dev/null 2>&1 || [ $timeout -eq 0 ]; do
+            echo "MinIO not ready yet... ($timeout seconds remaining)"
+            sleep 1
+            ((timeout--))
+          done
+          if [ $timeout -eq 0 ]; then
+            echo "Error: MinIO failed to start"
+            docker compose ps
+            docker compose logs minio
+            docker compose down -v
+            exit 1
+          else
+            echo "MinIO is ready."
+          fi
+
+      - name: Start API service
+        run: docker compose up -d api
+
+      - name: Wait for API service to be ready
+        run: |
+          set -euo pipefail
+          echo "Waiting for API service to be ready..."
+          timeout=120
+          until docker compose exec -T api pnpm run health-check >/dev/null 2>&1 || [ $timeout -eq 0 ]; do
+            echo "API service not ready yet... ($timeout seconds remaining)"
+            sleep 2
+            ((timeout--))
+          done
+          if [ $timeout -eq 0 ]; then
+            echo "Error: API service failed to start"
+            docker compose ps
+            docker compose logs api
+            docker compose down -v
+            exit 1
+          else
+            echo "API service is ready."
+          fi
+
+      - name: Run database migrations
+        run: docker compose exec -T api pnpm run db:migrate
+
+      - name: Test sample data script execution
+        run: docker compose exec -T api pnpm run add:sample_data
+
+      - name: Verify sample data was added successfully
+        run: |
+          echo "Checking if sample data was inserted successfully..."
+          docker compose exec -T api pnpm run db:check || {
+            echo "Error: Sample data verification failed"
+            exit 1
+          }
+
+      - name: Cleanup services
+        if: always()
+        run: docker compose down -v
+
     
   Check-AutoDocs:
     if: ${{ github.actor != 'dependabot[bot]' }}
