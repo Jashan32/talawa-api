@@ -435,7 +435,7 @@ export async function insertCollections(
 								const fileExtension = attachment.mimeType.split("/").pop();
 								const filePath = path.resolve(
 									dirname,
-									`./sample_data/images/${attachment.name}.${fileExtension}`,
+									`./sample_data/images/${attachment.objectName}.${fileExtension}`,
 								);
 								const fileData = await fs.readFile(filePath);
 								await minioClient.putObject(
