@@ -91,9 +91,7 @@ export const advertisementsTable = pgTable(
 			onDelete: "set null",
 			onUpdate: "cascade",
 		}),
-		/**
-		 * Mime type of the attachment.
-		 */
+
 		type: text("type", {
 			enum: advertisementTypeEnum.options,
 		}).notNull(),
