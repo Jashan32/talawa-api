@@ -428,7 +428,6 @@ export async function insertCollections(
 						schema.postAttachmentsTable.id,
 						1000,
 					);
-					// Handle file uploads to Minio.
 					await Promise.all(
 						post_attachments.map(async (attachment) => {
 							try {
