@@ -21,7 +21,6 @@ const envConfig = envSchema<EnvConfig>({
 	dotenv: true,
 	schema: envConfigSchema,
 });
-
 // Get the directory name of the current module
 export const dirname: string = path.dirname(fileURLToPath(import.meta.url));
 export const bucketName: string = envConfig.MINIO_ROOT_USER || "";
