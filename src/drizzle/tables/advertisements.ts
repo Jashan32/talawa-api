@@ -144,7 +144,6 @@ export const advertisementsTableRelations = relations(
 		}),
 	}),
 );
-
 export const advertisementsTableInsertSchema = createInsertSchema(
 	advertisementsTable,
 	{
