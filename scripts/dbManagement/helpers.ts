@@ -22,7 +22,7 @@ const envConfig = envSchema<EnvConfig>({
 	schema: envConfigSchema,
 });
 
-// Get the directory name of the current modules
+// Get the directory name of the current module
 export const dirname: string = path.dirname(fileURLToPath(import.meta.url));
 export const bucketName: string = envConfig.MINIO_ROOT_USER || "";
 // Create a new database client
@@ -428,7 +428,7 @@ export async function insertCollections(
 								const fileExtension = attachment.mimeType.split("/").pop();
 								const filePath = path.resolve(
 									dirname,
-									`./sample_data/images/${attachment.objectName}.${fileExtension}`,
+									`./sample_data/images/${attachment.name}.${fileExtension}`,
 								);
 								const fileData = await fs.readFile(filePath);
 								await minioClient.putObject(
